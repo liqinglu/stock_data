@@ -25,31 +25,42 @@ data['date'] = pd.to_datetime(data['date'])  # convert string to datetime series
 # tendency in past three months
 # tendency in past one year
 # how many days up/down in a year
+# see tm/tq curve when 'ending' price is peak
 
 # up/down group by month(monthview)
 dataTT = data.set_index('date')
 monthendingprice = []
-dateindex = []
-beginyear = dataTT.index[0].year
-endyear = dataTT.index[-1].year
-beginmonth = dataTT.index[0].month
-endmonth = dataTT.index[-1].month
-rollingdate = datetime(beginyear,beginmonth,1)
 
-while True:
-    currdate = "%4d-%02d"%(rollingdate.year,rollingdate.month)
-    dateindex.append(currdate)
-    monthendingprice.append(dataTT[currdate].ix[0,'ending'])
-    monthendingprice.append(dataTT[currdate].ix[-1,'ending'])
-    if rollingdate.year == endyear and rollingdate.month == endmonth:
-        break
-    rollingdate = datetime_offset_by_month(rollingdate,1)
+rng = pd.period_range(dataTT.index[0],dataTT.index[-1],freq='M')
+for currdate in rng:
+    monthendingprice.append(dataTT[str(currdate)].ix[0,'ending'])
+    monthendingprice.append(dataTT[str(currdate)].ix[-1,'ending'])
 
-monthview = DataFrame(np.array(monthendingprice).reshape(len(dateindex),2),index=np.array(dateindex),columns=['begin','end'])
+monthview = DataFrame(np.array(monthendingprice).reshape(len(rng),2),index=rng,columns=['begin','end'])
 monthview['ratio'] = (monthview['end'] - monthview['begin'])/monthview['begin']
 monthview['ratio'].plot(kind='bar')
 savefile = basen + '_' + 'monthview.png'
 savefig(savefile)
+
+#dateindex = []
+#beginyear = dataTT.index[0].year
+#endyear = dataTT.index[-1].year
+#beginmonth = dataTT.index[0].month
+#endmonth = dataTT.index[-1].month
+#rollingdate = datetime(beginyear,beginmonth,1)
+#while True:
+#    currdate = "%4d-%02d"%(rollingdate.year,rollingdate.month)
+#    dateindex.append(currdate)
+#    monthendingprice.append(dataTT[currdate].ix[0,'ending'])
+#    monthendingprice.append(dataTT[currdate].ix[-1,'ending'])
+#    if rollingdate.year == endyear and rollingdate.month == endmonth:
+#        break
+#    rollingdate = datetime_offset_by_month(rollingdate,1)
+#monthview = DataFrame(np.array(monthendingprice).reshape(len(dateindex),2),index=np.array(dateindex),columns=['begin','end'])
+#monthview['ratio'] = (monthview['end'] - monthview['begin'])/monthview['begin']
+#monthview['ratio'].plot(kind='bar')
+#savefile = basen + '_' + 'monthview.png'
+#savefig(savefile)
 
 # 年zhangdie(yearview)
 dataTT = data.set_index('date')
@@ -74,15 +85,16 @@ savefig(savefile)
 #stocklowest = data['ending'].min()
 
 # 收盘价的曲线
-histprice = data[['ending']]
-histprice.set_index(data['date'])
-histprice.plot()
+dataTT = data.set_index('date')
+dataTT['ending'].plot()
 savefile = basen + '_' + 'histprice.png'
 savefig(savefile)
 
 # 收盘价和成交额的曲线
-histpriceandtm = data[['ending','tm']]
-histpriceandtm.set_index(data['date'])
-histpriceandtm.plot(subplots=True)
+dataTT = data.set_index('date')
+dataTT[['ending','tm']].plot(subplots=True)
+#histpriceandtm = data[['ending','tm']]
+#histpriceandtm.set_index(data['date'])
+#histpriceandtm.plot(subplots=True)
 savefile = basen + '_' + 'histpriceandtm.png'
 savefig(savefile)
