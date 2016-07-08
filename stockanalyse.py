@@ -28,19 +28,19 @@ data['date'] = pd.to_datetime(data['date'])  # convert string to datetime series
 # see tm/tq curve when 'ending' price is peak
 
 # up/down group by month(monthview)
-dataTT = data.set_index('date')
-monthendingprice = []
-
-rng = pd.period_range(dataTT.index[0],dataTT.index[-1],freq='M')
-for currdate in rng:
-    monthendingprice.append(dataTT[str(currdate)].ix[0,'ending'])
-    monthendingprice.append(dataTT[str(currdate)].ix[-1,'ending'])
-
-monthview = DataFrame(np.array(monthendingprice).reshape(len(rng),2),index=rng,columns=['begin','end'])
-monthview['ratio'] = (monthview['end'] - monthview['begin'])/monthview['begin']
-monthview['ratio'].plot(kind='bar')
-savefile = basen + '_' + 'monthview.png'
-savefig(savefile)
+#dataTT = data.set_index('date')
+#monthendingprice = []
+#
+#rng = pd.period_range(dataTT.index[0],dataTT.index[-1],freq='M')
+#for currdate in rng:
+#    monthendingprice.append(dataTT[str(currdate)].ix[0,'ending'])
+#    monthendingprice.append(dataTT[str(currdate)].ix[-1,'ending'])
+#
+#monthview = DataFrame(np.array(monthendingprice).reshape(len(rng),2),index=rng,columns=['begin','end'])
+#monthview['ratio'] = (monthview['end'] - monthview['begin'])/monthview['begin']
+#monthview['ratio'].plot(kind='bar')
+#savefile = basen + '_' + 'monthview.png'
+#savefig(savefile)
 
 #dateindex = []
 #beginyear = dataTT.index[0].year
