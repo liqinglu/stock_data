@@ -4,7 +4,9 @@ import pandas as pd
 import numpy as np
 import datetime,time
 import os,sys
+import re
 import shutil
+import logging
 
 ##########################
 
@@ -12,9 +14,16 @@ columnlist=['date','start','highest','lowest','ending','tq','tm']
 
 reshapescript = "format_one_file.sh"
 datapath = './data'
+tmppath = './tmp'
 stockpoolini = 'stockpool.ini'
 
 ##########################
+
+logger = logging.getLogger('stockanalyse.util')
+
+class errcode:
+    NOERR = 0
+    NOT_DF_TYPE = 1
 
 def _convertName(name):
     cmd = "ls " + datapath + "/*" + name + "*"
@@ -26,8 +35,13 @@ def _getStockPool():
     pool = []
     with open(stockpoolini) as f:
         for line in f:
-            pool.append(_convertName(line.strip()))
+            m = re.match(r"#\d+",line)
+            if m:
+                continue
+            else:
+                pool.append(_convertName(line.strip()))
 
+    logger.info("get pool list OK")
     return pool
 
 stockpool = _getStockPool()
@@ -38,18 +52,67 @@ def reshapeDataFile(file):
 
 def getStockData(name):
     sourcefile = datapath + '/' + name
+    targetfile = tmppath + '/' + name
 
     try:
-        shutil.copy(sourcefile,name)
+        shutil.copy(sourcefile,targetfile)
     except IOError,e:
-        print "Error: [%d] [%s]"%(e.errno,e.strerror)
+        logger.error("IOError when copy: [%d] [%s]"%(e.errno,e.strerror))
         return None
 
-    val = reshapeDataFile(name)
-    data = pd.read_table(name,sep=',',names=columnlist)
+    val = reshapeDataFile(targetfile)
+    # example : data = pd.read_table('SH#600198.txt',sep=',',names=['date','start','highest','lowest','ending','tq','tm'])
+    data = None
+    data = pd.read_table(targetfile,sep=',',names=columnlist)
     data['date'] = pd.to_datetime(data['date'])  # convert string to datetime series
 
     return data
+
+def cleanTxt():
+    cmd = "rm -f " + tmppath + "/*.txt"
+    return os.system(cmd)
+
+def vibrate(handle):
+    if not isinstance(handle,pd.DataFrame):
+        logger.error("handle is not the instance of pd.DataFrame")
+        return False,errcode.NOT_DF_TYPE,None,None,None
+
+    handle['vibrate'] = handle['highest'] - handle['lowest']
+    thismean = np.mean(handle['vibrate'][-20:])
+    max_vibrate = max(handle['vibrate'])
+    max_vibrate_100 = max(handle['vibrate'][-100:])
+    del handle['vibrate']
+    return True,errcode.NOERR,max_vibrate,max_vibrate_100,thismean
+
+def quantity(handle):
+    if not isinstance(handle,pd.DataFrame):
+        logger.error("handle is not the instance of pd.DataFrame")
+        return False,errcode.NOT_DF_TYPE,None,None,None
+
+    thismean = np.mean(handle['tq'][-20:])
+    return True,errcode.NOERR,max(handle['tq']),max(handle['tq'][-100:]),thismean
+
+def get_price(handle):
+    if not isinstance(handle,pd.DataFrame):
+        logger.error("handle is not the instance of pd.DataFrame")
+        return False,errcode.NOT_DF_TYPE,None,None,None
+
+    return True,errcode.NOERR,max(handle['ending']),max(handle['ending'][-100:]),handle.ix[-1]['ending']
+
+def up_and_down(handle):
+    if not isinstance(handle,pd.DataFrame):
+        logger.error("handle is not the instance of pd.DataFrame")
+        return False,errcode.NOT_DF_TYPE,None,None,None
+
+    handle['updown'] = handle['ending'] - handle['start']
+    handle_200 = handle[-200:]
+    up_handle = handle_200[handle_200['updown']>0]
+    down_handle = handle_200[handle_200['updown']<0]
+    up_day,down_day,up_down = np.count_nonzero(up_handle['updown']),\
+            np.count_nonzero(down_handle['updown']),\
+            np.sum(up_handle['updown']) - np.abs(np.sum(down_handle['updown']))
+    del handle['updown']
+    return True,errcode.NOERR,up_day,down_day,up_down
 
 def monthMeanValue(data,start_date=None,drange=None):
     meanValuelist = []
@@ -66,11 +129,11 @@ def monthMeanValue(data,start_date=None,drange=None):
     return meanValuelist,rng
 
 #ATR function
-def calcMax(highest,lowest,yesterday):
+def _calcMax(highest,lowest,yesterday):
     return max(abs(highest-lowest),max(abs(highest-yesterday),abs(lowest-yesterday)))
 
-def calcDayATR(df):
-    return calcMax(df['highest'],df['lowest'],df['yesterday'])
+def _calcDayATR(df):
+    return _calcMax(df['highest'],df['lowest'],df['yesterday'])
 
 def calcATR(data,end_date=None,period=30):
     if end_date == None:
@@ -80,7 +143,7 @@ def calcATR(data,end_date=None,period=30):
     dataslice = data[ATRperiod[0]:ATRperiod[-1]]
     dataslice['yesterday'] = dataslice['ending'].shift(1)
     #print dataslice
-    dayATRlist = dataslice.apply(calcDayATR,axis=1).dropna()
+    dayATRlist = dataslice.apply(_calcDayATR,axis=1).dropna()
     #print dayATRlist
     return dayATRlist.mean(),dayATRlist.std()
 
@@ -95,7 +158,7 @@ def monthATR(data,start_date=None):
     for eachmonth in rng:
         dataslice = data[str(eachmonth)]
         dataslice['yesterday'] = dataslice['ending'].shift(1)
-        monthATRlist = dataslice.apply(calcDayATR,axis=1).dropna()
+        monthATRlist = dataslice.apply(_calcDayATR,axis=1).dropna()
 
         meanATRlist.append(monthATRlist.mean())
         stdATRlist.append(monthATRlist.std())

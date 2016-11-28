@@ -1,100 +1,101 @@
 # -*- coding: utf-8 -*-
+'''
+2. handle stock_analyse_res
+'''
 
 import numpy as np
 import pandas as pd
 from pandas import Series,DataFrame
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import savefig
-from stockutil import datetime_offset_by_month
 from datetime import datetime
 import os
+import time
+import logging
+import logging.config
 
-stockfile = "SH#600000.txt"
-basen = os.path.splitext(stockfile)[0]
-data = pd.read_table(stockfile,sep=',',names=['date','start','highest','lowest','ending','tq','tm'])
-data['date'] = pd.to_datetime(data['date'])  # convert string to datetime series
-#print data
+logging.config.fileConfig('log.conf')
+root_logger = logging.getLogger('root')
+logger = logging.getLogger('stockanalyse')
 
-# highest tm/tq historically
-# lowest tm/tq historically
-# highest 'highest'-'lowest'
-# lowest 'highest'-'lowest'
-# period when 'ending' < 'ending'*1.2 , 'ending' == stocklowest
-# period when 'ending' > 'ending'*0.9 , 'ending' == stockhighest
-# how many peaks during this period
-# tendency in past three months
-# tendency in past one year
-# how many days up/down in a year
-# see tm/tq curve when 'ending' price is peak
+#import stockutil
+from stockutil import stockpool,getStockData,cleanTxt
+from stockutil import vibrate,errcode,quantity,get_price,up_and_down
 
-# up/down group by month(monthview)
-#dataTT = data.set_index('date')
-#monthendingprice = []
-#
-#rng = pd.period_range(dataTT.index[0],dataTT.index[-1],freq='M')
-#for currdate in rng:
-#    monthendingprice.append(dataTT[str(currdate)].ix[0,'ending'])
-#    monthendingprice.append(dataTT[str(currdate)].ix[-1,'ending'])
-#
-#monthview = DataFrame(np.array(monthendingprice).reshape(len(rng),2),index=rng,columns=['begin','end'])
-#monthview['ratio'] = (monthview['end'] - monthview['begin'])/monthview['begin']
-#monthview['ratio'].plot(kind='bar')
-#savefile = basen + '_' + 'monthview.png'
-#savefig(savefile)
+def retkey(unknown):
+    if isinstance(unknown,str):
+        return os.path.splitext(unknown)[0][-6:]
+    elif isinstance(unknown,list):
+        changestockpool = []
+        for stock in unknown:
+            changestock = os.path.splitext(stock)[0][-6:]
+            changestockpool.append(changestock)
 
-#dateindex = []
-#beginyear = dataTT.index[0].year
-#endyear = dataTT.index[-1].year
-#beginmonth = dataTT.index[0].month
-#endmonth = dataTT.index[-1].month
-#rollingdate = datetime(beginyear,beginmonth,1)
-#while True:
-#    currdate = "%4d-%02d"%(rollingdate.year,rollingdate.month)
-#    dateindex.append(currdate)
-#    monthendingprice.append(dataTT[currdate].ix[0,'ending'])
-#    monthendingprice.append(dataTT[currdate].ix[-1,'ending'])
-#    if rollingdate.year == endyear and rollingdate.month == endmonth:
-#        break
-#    rollingdate = datetime_offset_by_month(rollingdate,1)
-#monthview = DataFrame(np.array(monthendingprice).reshape(len(dateindex),2),index=np.array(dateindex),columns=['begin','end'])
-#monthview['ratio'] = (monthview['end'] - monthview['begin'])/monthview['begin']
-#monthview['ratio'].plot(kind='bar')
-#savefile = basen + '_' + 'monthview.png'
-#savefig(savefile)
+        return changestockpool
+    else:
+        pass
 
-# 年zhangdie(yearview)
-dataTT = data.set_index('date')
-dayendingprice = []
-beginyear = dataTT.index[0].year
-endyear = dataTT.index[-1].year
-yearindex = np.arange(beginyear,endyear+1)
-for year in yearindex:
-    dayendingprice.append(dataTT[str(year)].ix[0,'ending'])
-    dayendingprice.append(dataTT[str(year)].ix[-1,'ending'])
+logger.info("stock log start ...")
 
-yearview = DataFrame(np.array(dayendingprice).reshape(len(yearindex),len(dayendingprice)/len(yearindex)),index=yearindex,columns=['begin','end'])
-yearview['ratio'] = (yearview['end'] - yearview['begin'])/yearview['begin']
-yearview['ratio'].plot(kind='bar')
-savefile = basen + '_' + 'yearview.png'
-savefig(savefile)
+analyselist=['vibrate_rate','vibrate_rate_100','quantity_rate','quantity_rate_100',\
+        'max_price','max_price_100','current_price','up_day_200','down_day_200',\
+        'up_and_down_200']
+changed_stockpool = retkey(stockpool)
+stock_analyse_res = pd.DataFrame(index=changed_stockpool,columns=analyselist)
 
-# 历史最高价
-#stockhighest = data['ending'].max()
+start_time = time.time()
+for stockfile in stockpool:
+    basekey = retkey(stockfile)
+    #logger.info("now handling stock code : %s"%basekey)
+    data = getStockData(stockfile)
+    if data is None or len(data.index) == 0:
+        logger.warning("%s is missing" % stockfile)
+        continue
+    data_handle = data.set_index('date')
+    data_handle = data_handle.resample('B').fillna(method='ffill')
 
-# 历史最低价
-#stocklowest = data['ending'].min()
+    #vibrate
+    result,errcode,max_vibrate,max_vibrate_100,last_mean_20 = vibrate(data_handle)
+    if result:
+        #logger.info("vibrate : %s %s %s"%(max_vibrate,max_vibrate_100,last_mean_20))
+        stock_analyse_res.loc[basekey,'vibrate_rate'] = last_mean_20/max_vibrate
+        stock_analyse_res.loc[basekey,'vibrate_rate_100'] = last_mean_20/max_vibrate_100
+    else:
+        logger("error handle : %s when %s" % (stockfile,'execute vibrate'))
 
-# 收盘价的曲线
-dataTT = data.set_index('date')
-dataTT['ending'].plot()
-savefile = basen + '_' + 'histprice.png'
-savefig(savefile)
+    #deal quantity
+    result,errcode,max_quantity,max_quantity_100,last_mean_20 = quantity(data_handle)
+    if result:
+        #logger.info("quantity : %s %s %s"%(max_quantity,max_quantity_100,last_mean_20))
+        stock_analyse_res.loc[basekey,'quantity_rate'] = last_mean_20/max_quantity
+        stock_analyse_res.loc[basekey,'quantity_rate_100'] = last_mean_20/max_quantity_100
+    else:
+        logger.warning( "error handle : %s when %s" % (stockfile,'execute quantity') )
 
-# 收盘价和成交额的曲线
-dataTT = data.set_index('date')
-dataTT[['ending','tm']].plot(subplots=True)
-#histpriceandtm = data[['ending','tm']]
-#histpriceandtm.set_index(data['date'])
-#histpriceandtm.plot(subplots=True)
-savefile = basen + '_' + 'histpriceandtm.png'
-savefig(savefile)
+    #ending price
+    result,errcode,max_price,max_price_100,current_price = get_price(data_handle)
+    if result:
+        #logger.info("price : %s %s %s"%(max_price,max_price_100,current_price))
+        stock_analyse_res.loc[basekey,'max_price'] = max_price
+        stock_analyse_res.loc[basekey,'max_price_100'] = max_price_100
+        stock_analyse_res.loc[basekey,'current_price'] = current_price
+    else:
+        logger.warning( "error handle : %s when %s" % (stockfile,'execute get_price') )
+
+    #up @vs down
+    result,errcode,up_day_200,down_day_200,up_and_down_200 = up_and_down(data_handle)
+    if result:
+        #logger.info("up and down : %s %s %s"%(up_day_200,down_day_200,up_and_down_200))
+        stock_analyse_res.loc[basekey,'up_day_200'] = up_day_200
+        stock_analyse_res.loc[basekey,'down_day_200'] = down_day_200
+        stock_analyse_res.loc[basekey,'up_and_down_200'] = up_and_down_200
+    else:
+        logger.warning("error handle : %s when %s" % (stockfile,'execute up_and_down'))
+
+    data,data_handle = None,None
+
+end_time = time.time()
+cleanTxt()
+logger.info(stock_analyse_res)
+logger.info("Duration : %s" % ( end_time - start_time ))
+logger.info("stock log ended ...")

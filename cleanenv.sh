@@ -1,4 +1,4 @@
 #!/bin/sh
 
-rm *.png
-rm *.txt
+rm *.png 2>/dev/null
+rm ./tmp/*.txt 2>/dev/null

@@ -8,6 +8,7 @@ from matplotlib.pyplot import savefig
 import os,sys
 from stockutil import stockpool
 from stockutil import getStockData
+from stockutil import cleanTxt
 
 MAlist = [5,10,30,60]
 MAcolor = ['w','y','m','c']
@@ -27,6 +28,11 @@ for stockfile in stockpool:
         pd.rolling_mean(dataMA.ending[-360:],days).plot(color=usedcolor)
 
     filename = basen + '_' + "MA_5_10_30_60.png"
-    #savefig(filename)
+    savefig(filename)
+    '''
     plt.show()
+    '''
+
     data,dataMA = None,None
+
+cleanTxt()

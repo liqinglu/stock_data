@@ -10,6 +10,7 @@ from stockutil import stockpool
 from stockutil import monthATR,calcATR
 from stockutil import monthMeanValue
 from stockutil import getStockData
+from stockutil import cleanTxt
 
 for stockfile in stockpool:
     basen = os.path.splitext(stockfile)[0]
@@ -39,11 +40,10 @@ for stockfile in stockpool:
     Series(meanATR,index=daterangeATR).plot(kind='bar',color='r')
     plt.sca(ax2)
     Series(meanEnding,index=daterangeEnding).plot(kind='bar',color='b')
+    '''
+    plt.show()
+    '''
     filename = basen + '_' + "ATR_meanStockPrice.png"
     savefig(filename)
-    #Series(meanATR,index=daterangeATR).plot(kind='bar',color='r')
-    #plt.show()
-    #savefig("ATR.png")
-    #Series(meanEnding,index=daterangeEnding).plot(kind='bar',color='b')
-    #plt.show()
-    #savefig("meanEnding.png")
+
+cleanTxt()
