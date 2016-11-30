@@ -1,0 +1,17 @@
+# README
+
+# file list
+ATR.py
+MA.py
+MACD.py
+stockanalyse.py
+stockutil.py
+stockpool.ini
+refreshpool.sh
+cleanenv.sh
+format_one_file.sh
+log.conf
+README
+
+# what data come from
+  The data files are come from 'ShenA'/'HuA'/'Chuangyeban'/'Zhongxiaoban'/'HuShenFund'
