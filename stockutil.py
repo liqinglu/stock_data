@@ -26,7 +26,7 @@ class errcode:
     NOT_DF_TYPE = 1
 
 def _convertName(name):
-    cmd = "ls " + datapath + "/*" + name + "*"
+    cmd = "ls {0}/*{1}*".format(datapath,name)
     ret = os.popen(cmd).read()
     namewithpath = ret.split('\n')[0]
     return namewithpath.split('/')[-1]
@@ -47,12 +47,12 @@ def _getStockPool():
 stockpool = _getStockPool()
 
 def reshapeDataFile(file):
-    cmd = "./" + reshapescript + " " + file
+    cmd = "./{0} {1}".format(reshapescript,file)
     return os.system(cmd)
 
 def getStockData(name):
-    sourcefile = datapath + '/' + name
-    targetfile = tmppath + '/' + name
+    sourcefile = "{0}/{1}".format(datapath,name)
+    targetfile = "{0}/{1}".format(tmppath,name)
 
     try:
         shutil.copy(sourcefile,targetfile)
@@ -69,7 +69,7 @@ def getStockData(name):
     return data
 
 def cleanTxt():
-    cmd = "rm -f " + tmppath + "/*.txt"
+    cmd = "rm -f {0}/*.txt".format(tmppath)
     return os.system(cmd)
 
 def vibrate(handle):
