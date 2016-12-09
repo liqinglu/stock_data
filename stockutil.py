@@ -7,6 +7,7 @@ import os,sys
 import re
 import shutil
 import logging
+import collections as coll
 
 ##########################
 
@@ -165,6 +166,59 @@ def monthATR(data,start_date=None):
 
     return meanATRlist,stdATRlist,rng
 #end ATR function
+
+def tosuggest(count):
+    if ( count <= 5 ):
+        return count
+    elif ( 5 < count <= 25 ):
+        return 5
+    elif ( 25 < count <= 100 ):
+        return count / 5
+    else:
+        return 20
+
+def suggeststock(df,count,category=None):
+    if category == None:
+        return None,None
+
+    if category == "vibrate":
+        cols = ['vibrate_rate','vibrate_rate_100']
+        df_op = df[cols]
+        return df_op.sort_index(by='vibrate_rate_100')[:count].index,\
+                df_op.sort_index(by='vibrate_rate_100')[:count]
+    elif category == "quantity":
+        cols = ['quantity_rate','quantity_rate_100']
+        df_op = df[cols]
+        return df_op.sort_index(by='quantity_rate_100')[:count].index,\
+                df_op.sort_index(by='quantity_rate_100')[:count]
+    elif category == "up_and_down":
+        cols = ['up_day_200','down_day_200','up_and_down_200']
+        df_op = df[cols]
+        return df_op.sort_index(by='up_and_down_200')[:count].index,\
+                df_op.sort_index(by='up_and_down_200')[:count]
+    else:
+        return None,None
+
+def default_zero():
+    return 0
+
+def suggestsingle(*args):
+    ret = coll.defaultdict(default_zero)
+    for i in args:
+        for single in i:
+            ret[single] += 1
+
+    return ret
+
+def analyse_stock(handle,op_num):
+    vibrate_list,vibrate_suggest = suggeststock(handle,op_num,"vibrate")
+    logger.debug("vibrate:\n%s"%vibrate_suggest)
+    quantity_list,quantity_suggest = suggeststock(handle,op_num,"quantity")
+    logger.debug("quantity:\n%s"%quantity_suggest)
+    up_and_down_list,up_and_down_suggest = suggeststock(handle,op_num,"up_and_down")
+    logger.debug("up_and_down:\n%s"%up_and_down_suggest)
+    ddict = suggestsingle(vibrate_list,quantity_list,up_and_down_list)
+    logger.debug("suggest stock [high priority first] :\n%s" % sorted(ddict.items(),key=lambda item:item[1],reverse=True))
 
 def datetime_offset_by_month(datetime1,n=1):
     q,r = divmod(datetime1.month + n,12)

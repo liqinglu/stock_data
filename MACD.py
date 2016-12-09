@@ -6,6 +6,7 @@ from pandas import Series,DataFrame
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import savefig
 import os,sys
+
 from stockutil import stockpool,getStockData,cleanTxt
 
 for stockfile in stockpool:
